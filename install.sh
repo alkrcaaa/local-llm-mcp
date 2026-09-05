@@ -32,11 +32,11 @@ echo "  Installing dependencies..."
 # settings.json hard restrictions -- global permissions are the authoritative fix.
 if command -v python3 &>/dev/null && [ -f "$QWEN_SETTINGS" ]; then
     echo "  Patching global ~/.qwen/settings.json with write permissions..."
-    python3 "$SCRIPT_DIR/scripts/patch_qwen_settings.py"
+    python3 "$SCRIPT_DIR/scripts/patch_cli_settings.py"
 elif ! command -v python3 &>/dev/null; then
     echo "  python3 not found -- skipping ~/.qwen/settings.json patch (do it manually)"
 elif [ ! -f "$QWEN_SETTINGS" ]; then
-    echo "  ~/.qwen/settings.json not found -- Qwen Code CLI not installed yet? Run after installing it."
+    echo "  ~/.qwen/settings.json not found -- if WORKER_CLI_BIN is the default (qwen), install the Qwen Code CLI first; otherwise this step doesn't apply to your CLI."
 fi
 
 CLAUDE_JSON="$HOME/.claude/claude.json"
@@ -45,7 +45,7 @@ if [ -f "$CLAUDE_JSON" ] && command -v python3 &>/dev/null; then
     python3 "$SCRIPT_DIR/scripts/register_claude_mcp.py" "$VENV_DIR/bin/python" "$SCRIPT_DIR/server.py"
 else
     echo "  ~/.claude/claude.json not found -- add the MCP server manually:"
-    echo "  {\"qwen\": {\"command\": \"$VENV_DIR/bin/python\", \"args\": [\"$SCRIPT_DIR/server.py\"]}}"
+    echo "  {\"local-model\": {\"command\": \"$VENV_DIR/bin/python\", \"args\": [\"$SCRIPT_DIR/server.py\"]}}"
 fi
 
 echo ""

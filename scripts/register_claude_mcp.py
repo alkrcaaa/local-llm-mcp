@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Register this server as the 'qwen' MCP entry in ~/.claude/claude.json.
+"""Register this server as the 'local-model' MCP entry in ~/.claude/claude.json.
 
 Usage: register_claude_mcp.py <python-binary> <server.py-path>
 """
@@ -13,7 +13,7 @@ claude_json = os.path.expanduser("~/.claude/claude.json")
 with open(claude_json) as f:
     data = json.load(f)
 
-data.setdefault("mcpServers", {})["qwen"] = {
+data.setdefault("mcpServers", {})["local-model"] = {
     "command": python_bin,
     "args": [server_py],
     "env": {},
@@ -22,4 +22,4 @@ data.setdefault("mcpServers", {})["qwen"] = {
 with open(claude_json, "w") as f:
     json.dump(data, f, indent=2)
 
-print(f"   Registered: qwen -> {python_bin} {server_py}")
+print(f"   Registered: local-model -> {python_bin} {server_py}")
