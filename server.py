@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCP server for Qwen local model integration.
+"""MCP server bridging Claude Code to a local model via the Qwen Code CLI.
 
 Exposes three tools:
 - qwen_execute: Run task on Qwen
@@ -92,7 +92,7 @@ QWEN_ALLOWED_TOOLS = [
     "monitor",
 ]
 
-server = FastMCP("qwen-mcp-server", "1.0.0")
+server = FastMCP("local-model-mcp", "1.0.0")
 
 
 @server.tool()
