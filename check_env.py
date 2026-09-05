@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check Qwen MCP server environment and connectivity."""
+"""Check local-model-mcp's environment and connectivity to the model server."""
 
 import argparse
 import json
@@ -24,7 +24,7 @@ DEFAULT_MODEL = "/models/qwen3.8-27b"
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Check Qwen MCP server environment")
+    parser = argparse.ArgumentParser(description="Check local-model-mcp's environment")
     parser.add_argument("--timeout", type=int, default=5, help="Request timeout in seconds (default: 5)")
     parser.add_argument("--quiet", "-q", action="store_true", help="Suppress env var output")
     args = parser.parse_args()
