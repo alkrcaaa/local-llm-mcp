@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
-"""Add the permission entries Qwen Code CLI needs to run unattended (yolo mode)
-to the user's global ~/.qwen/settings.json. --approval-mode yolo bypasses
-per-call prompts but not settings.json hard restrictions -- this is what
-actually grants the access.
+"""Add the permission entries the Qwen Code CLI needs to run unattended (yolo
+mode) to the user's global ~/.qwen/settings.json. --approval-mode yolo
+bypasses per-call prompts but not settings.json hard restrictions -- this is
+what actually grants the access.
+
+Only runs when WORKER_CLI_BIN is unset or "qwen" (the default) -- this is the
+one place left that's genuinely specific to that CLI's own settings schema.
+If you've pointed WORKER_CLI_BIN at a different coding-agent CLI, its
+permission model is its own and this script has nothing to patch.
 """
 import json
 import os
+
+worker_cli = os.environ.get("WORKER_CLI_BIN", "qwen")
+if worker_cli != "qwen":
+    print(f"   WORKER_CLI_BIN={worker_cli} -- skipping Qwen-specific settings.json patch")
+    raise SystemExit(0)
 
 settings_path = os.path.expanduser("~/.qwen/settings.json")
 with open(settings_path) as f:

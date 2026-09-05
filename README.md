@@ -1,10 +1,12 @@
 # local-model-mcp
 
 MCP (Model Context Protocol) server that lets Claude Code (or any MCP client)
-delegate coding tasks to a local model through the [Qwen Code CLI](https://github.com/QwenLM/qwen-code) —
-pointed at whatever OpenAI-compatible endpoint you run: a local vLLM instance,
-Ollama, or any other self-hosted server. The CLI happens to be named "qwen"
-but the model behind `QWEN_BASE_URL` is entirely up to you.
+delegate coding tasks to a local model through a coding-agent CLI — pointed at
+whatever OpenAI-compatible endpoint you run: a local vLLM instance, Ollama, or
+any other self-hosted server. Ships configured for the
+[Qwen Code CLI](https://github.com/QwenLM/qwen-code) by default (`WORKER_CLI_BIN=qwen`),
+but the model behind `MODEL_BASE_URL` — and the CLI binary itself — are both
+configurable.
 
 ## Architecture
 
@@ -19,16 +21,17 @@ but the model behind `QWEN_BASE_URL` is entirely up to you.
 │  local-model-mcp        │
 │  (this project)         │
 │                         │
-│  - qwen_execute         │
-│  - qwen_health_check    │
-│  - qwen_execute_with_   │
+│  - execute_task         │
+│  - health_check         │
+│  - execute_task_with_   │
 │    context              │
 └────────────┬────────────┘
              │ subprocess + env vars
              ▼
 ┌─────────────────────────┐
-│   Qwen Code CLI         │
-│   (your model server)   │
+│   Worker CLI             │
+│   (WORKER_CLI_BIN,       │
+│    default: qwen)        │
 │                         │
 │ http://YOUR_SERVER:     │
 │   8002/v1               │
@@ -39,7 +42,7 @@ but the model behind `QWEN_BASE_URL` is entirely up to you.
 
 ### Prerequisites
 - Python 3.9+
-- Qwen Code CLI in `PATH`
+- The worker CLI in `PATH` (Qwen Code CLI by default)
 - An OpenAI-compatible model server reachable at some `http://HOST:PORT/v1`
 
 ### Install
@@ -51,16 +54,17 @@ but the model behind `QWEN_BASE_URL` is entirely up to you.
 This will:
 1. Copy `.env.example` to `.env` (edit it to point at your server)
 2. Create a Python virtual environment and install dependencies
-3. Register the server in `~/.claude/claude.json` if present
-4. Patch `~/.qwen/settings.json` with the write/exec permissions the CLI needs to run unattended
+3. Register the server as `local-model` in `~/.claude/claude.json` if present
+4. If `WORKER_CLI_BIN` is the default (`qwen`), patch `~/.qwen/settings.json` with the write/exec permissions the CLI needs to run unattended
 
 ### Configure
 
 Edit `.env`:
 
 ```bash
-QWEN_BASE_URL=http://your-server:8002/v1
-QWEN_MODEL=/models/your-model   # optional — auto-detected from the server if unset
+MODEL_BASE_URL=http://your-server:8002/v1
+MODEL_NAME=/models/your-model     # optional — auto-detected from the server if unset
+WORKER_CLI_BIN=qwen               # optional — set to a different coding-agent CLI if not using Qwen Code
 ```
 
 Verify:
@@ -76,7 +80,7 @@ Add to `.mcp.json` or `~/.claude/claude.json`:
 ```json
 {
   "mcpServers": {
-    "qwen": {
+    "local-model": {
       "command": "local-model-mcp/.venv/bin/python",
       "args": ["local-model-mcp/server.py"]
     }
@@ -84,11 +88,11 @@ Add to `.mcp.json` or `~/.claude/claude.json`:
 }
 ```
 
-`.env` in this directory supplies `QWEN_BASE_URL`/`QWEN_MODEL` if you don't set them in the client's own `env` block — either works, the client's `env` block wins.
+`.env` in this directory supplies `MODEL_BASE_URL`/`MODEL_NAME`/`WORKER_CLI_BIN` if you don't set them in the client's own `env` block — either works, the client's `env` block wins.
 
 ## Tools
 
-### qwen_health_check()
+### health_check()
 
 Check if the model server is online.
 
@@ -104,14 +108,14 @@ Check if the model server is online.
 
 **Usage:**
 ```python
-result = await client.call_tool("qwen_health_check", {})
+result = await client.call_tool("health_check", {})
 if result["status"] == "online":
-    # Safe to proceed with qwen_execute
+    # Safe to proceed with execute_task
 ```
 
 ---
 
-### qwen_execute(task, working_dir, files?)
+### execute_task(task, working_dir, files?)
 
 Execute a task on the model.
 
@@ -138,7 +142,7 @@ Execute a task on the model.
 
 **Example:**
 ```python
-result = await client.call_tool("qwen_execute", {
+result = await client.call_tool("execute_task", {
     "task": "Write unit tests for add() function in src/utils.py",
     "working_dir": "/Users/you/workspace/myproject",
     "files": ["src/utils.py"]
@@ -147,7 +151,7 @@ result = await client.call_tool("qwen_execute", {
 
 ---
 
-### qwen_execute_with_context(task, working_dir, context_files)
+### execute_task_with_context(task, working_dir, context_files)
 
 Execute task with file contents prepended to the prompt.
 
@@ -157,11 +161,11 @@ Execute task with file contents prepended to the prompt.
 - `context_files` (list[str]): File paths to read and include as context
 
 **Returns:**
-Same as `qwen_execute`
+Same as `execute_task`
 
 **Example:**
 ```python
-result = await client.call_tool("qwen_execute_with_context", {
+result = await client.call_tool("execute_task_with_context", {
     "task": "Add error handling to the request function",
     "working_dir": "/Users/you/workspace/api",
     "context_files": [
@@ -179,11 +183,11 @@ In your prompt when invoking tools:
 
 ```markdown
 AVAILABLE MCP:
-- qwen (qwen_health_check, qwen_execute, qwen_execute_with_context)
+- local-model (health_check, execute_task, execute_task_with_context)
 
 WORKFLOW:
-1. Call qwen_health_check() → verify the model server is online
-2. IF online → call qwen_execute() with full task details
+1. Call health_check() → verify the model server is online
+2. IF online → call execute_task() with full task details
 3. IF offline → implement yourself, notify user
 ```
 
@@ -191,7 +195,7 @@ WORKFLOW:
 
 1. **Always health check first:**
    ```
-   status = qwen_health_check()
+   status = health_check()
    if status["status"] != "online":
        # Fall back to manual implementation
    ```
@@ -209,14 +213,14 @@ WORKFLOW:
    - Read full `stdout` for detailed results
 
 5. **For multi-file tasks:**
-   - Use `qwen_execute_with_context` to pass existing code
+   - Use `execute_task_with_context` to pass existing code
    - Or include file paths in task string with full instructions
 
 ## Prompt Engineering
 
 ### Sandwich Instruction Pattern
 
-Every `qwen_execute` call automatically wraps the task with a PREFIX and SUFFIX to combat "description instead of code" failures. The model is instructed to write complete, runnable code — not explanations, partial snippets, or markdown-wrapped output.
+Every `execute_task` call automatically wraps the task with a PREFIX and SUFFIX to combat "description instead of code" failures. The model is instructed to write complete, runnable code — not explanations, partial snippets, or markdown-wrapped output.
 
 The prompt structure is:
 
@@ -243,7 +247,7 @@ This "sandwich" approach combats the "lost in the middle" problem on long prompt
 
 ### Automatic Project Conventions Injection
 
-If the working directory contains `qwen-memory/project-conventions.md`, its contents are automatically injected between the PREFIX and the task. This lets projects define conventions once and have them applied to every call without repeating them each time.
+If the working directory contains `qwen-memory/project-conventions.md`, its contents are automatically injected between the PREFIX and the task. This directory name is kept as-is (not generalized along with the rest of this project) so existing per-project convention files keep working without a silent migration. This lets projects define conventions once and have them applied to every call without repeating them each time.
 
 ```bash
 mkdir -p /path/to/project/qwen-memory
@@ -269,10 +273,10 @@ SUFFIX
 
 ## Troubleshooting
 
-### "qwen CLI not found"
+### "<worker CLI> CLI not found"
 
 ```bash
-which qwen
+which qwen   # or whatever WORKER_CLI_BIN points to
 # If not in PATH, add to ~/.zshrc or ~/.bashrc:
 export PATH="/path/to/qwen/bin:$PATH"
 ```
@@ -310,6 +314,7 @@ DEBUG=true .venv/bin/python server.py    # enable MCP debug logging
 Set via `.env` (see `.env.example`) or exported directly:
 
 ```bash
-QWEN_BASE_URL=http://custom-host:8002/v1
-QWEN_MODEL=/models/custom-model
+MODEL_BASE_URL=http://custom-host:8002/v1
+MODEL_NAME=/models/custom-model
+WORKER_CLI_BIN=qwen
 ```
