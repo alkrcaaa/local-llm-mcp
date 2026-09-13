@@ -24,8 +24,14 @@ else
 fi
 
 echo "  Installing dependencies..."
-"$VENV_DIR/bin/pip" install --quiet --upgrade pip
-"$VENV_DIR/bin/pip" install --quiet -r "$SCRIPT_DIR/requirements.txt"
+# Never call .venv/bin/pip: its shebang hard-codes the path the venv was created
+# at, so it breaks once the checkout moves. uv venvs have no pip at all.
+if command -v uv &>/dev/null; then
+    uv pip install --quiet --python "$VENV_DIR/bin/python" -r "$SCRIPT_DIR/requirements.txt"
+else
+    "$VENV_DIR/bin/python" -m pip install --quiet --upgrade pip
+    "$VENV_DIR/bin/python" -m pip install --quiet -r "$SCRIPT_DIR/requirements.txt"
+fi
 
 # Ensure the Qwen Code CLI can write/edit files in any project, regardless of
 # project-level settings.json. --approval-mode yolo bypasses prompts but NOT
