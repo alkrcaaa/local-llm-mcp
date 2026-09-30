@@ -1,0 +1,8 @@
+{
+  "default": "qwen-a",
+  "workers": {
+    "qwen-a": {"kind": "qwen", "base_url": "http://your-host-a:8002/v1", "model": ""},
+    "qwen-b": {"kind": "qwen", "base_url": "http://your-host-b:8002/v1", "model": ""},
+    "gemini": {"kind": "agy"}
+  }
+}
