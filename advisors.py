@@ -114,8 +114,11 @@ def _build(spec: dict, worker_cmd_prompt: str, model: str, timeout: int) -> tupl
         env = {"OPENAI_API_KEY": "not-needed", "OPENAI_BASE_URL": spec["base_url"], "OPENAI_MODEL": model}
         return cmd, env
     if spec["kind"] == "agy":
-        return [spec.get("bin", "agy"), "-p", worker_cmd_prompt, "--output-format", "json",
-                "--print-timeout", f"{timeout}s", "--mode", "plan"], {}
+        cmd = [spec.get("bin", "agy"), "-p", worker_cmd_prompt, "--output-format", "json",
+               "--print-timeout", f"{timeout}s", "--mode", "plan"]
+        if spec.get("model"):  # else agy falls back to the IDE-shared settings.json model
+            cmd += ["--model", spec["model"]]
+        return cmd, {}
     raise ValueError(f"unknown worker kind: {spec['kind']}")
 
 
