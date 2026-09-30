@@ -16,6 +16,8 @@ import httpx
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
+import advisors
+
 # Explicit path, not cwd-relative: an MCP client launches this server with the
 # caller's project directory as cwd (whatever the user has open), not this
 # script's own directory — a bare load_dotenv() would silently find nothing
@@ -260,6 +262,41 @@ def execute_task_with_context(
 
     full_task = "\n".join(context_parts) + f"\n\nTASK:\n{task}"
     return execute_task(full_task, working_dir)
+
+
+@server.tool()
+def list_workers() -> dict[str, Any]:
+    """List configured advisor workers with live status and the model each server serves.
+
+    Workers come from workers.json (re-read every call): edit that file to move a
+    host or swap a model, no restart needed.
+    """
+    return advisors.list_workers(MODEL_BASE_URL)
+
+
+@server.tool()
+def ask_worker(
+    prompt: str,
+    working_dir: str,
+    worker: str = "",
+    role: str = "ask",
+    timeout: int = 300,
+) -> dict[str, Any]:
+    """Ask a worker (local Qwen or Gemini) a READ-ONLY question about a project.
+
+    The worker runs in a throwaway copy of working_dir, so it cannot change your
+    files; any write attempt is reported in 'write_attempts_discarded', and a
+    change to the original tree makes status 'VIOLATION'. It has no memory of
+    earlier calls and sees only git-tracked + untracked-not-ignored files.
+
+    Args:
+        prompt: The question or task. Name files/paths explicitly.
+        working_dir: Absolute path to the project root.
+        worker: Name from list_workers; empty = the configured default.
+        role: ask | explore | review | plan.
+        timeout: Seconds before the call is abandoned.
+    """
+    return advisors.ask_worker(prompt, working_dir, worker, role, timeout, MODEL_BASE_URL)
 
 
 def _is_git_repo(working_path: Path) -> bool:

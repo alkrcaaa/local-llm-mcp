@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 .env
 !.env.example
+workers.json
 *.egg-info/
 build/
 dist/

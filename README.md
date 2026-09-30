@@ -177,6 +177,36 @@ result = await client.call_tool("execute_task_with_context", {
 
 ---
 
+### Read-only advisors: list_workers() / ask_worker(prompt, working_dir, worker?, role?, timeout?)
+
+Ask a local Qwen or Gemini a question about a project without letting it change anything.
+`role` is `ask` (default), `explore`, `review` or `plan`.
+
+Workers are defined in `workers.json` (copy `workers.example.json`; the real file is
+gitignored). It is re-read on every call, so **changing a host or swapping a model is one
+edit, no restart**:
+
+```json
+{"default": "qwen-a", "workers": {
+  "qwen-a": {"kind": "qwen", "base_url": "http://host-a:8002/v1", "model": ""},
+  "gemini": {"kind": "agy"}}}
+```
+
+- `kind: qwen` — any OpenAI-compatible vLLM endpoint via the Qwen Code CLI. `model: ""`
+  asks the server which id it serves (survives a relaunch on a new checkpoint).
+- `kind: agy` — Gemini through the Antigravity CLI (subscription login). The plain `gemini`
+  CLI needs an API key and is not used.
+- `list_workers()` shows each worker's live status and served model.
+
+**Read-only is structural, not trusted to the CLI.** `agy --mode plan` was observed to
+write files anyway. The worker runs in a throwaway copy of `working_dir` (git-tracked +
+untracked-not-ignored files only, 200 MB cap; submodule contents are not copied). Relative
+writes land in the copy and are listed in `write_attempts_discarded`. The original is
+fingerprinted before/after: an absolute-path write is *detected, not prevented* and turns
+the status into `VIOLATION`. Always check `status` before relying on the answer.
+
+---
+
 ## Usage from Claude Code
 
 In your prompt when invoking tools:
