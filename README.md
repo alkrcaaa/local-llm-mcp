@@ -199,7 +199,8 @@ edit, no restart**:
 - `list_workers()` shows each worker's live status and served model.
 
 **Read-only is structural, not trusted to the CLI.** `agy --mode plan` was observed to
-write files anyway. The worker runs in a throwaway copy of `working_dir` (git-tracked +
+write files anyway, and it makes every turn produce a plan + walkthrough artifact (a
+one-line read: 47 s vs 14 s), so agy now runs without it. The worker runs in a throwaway copy of `working_dir` (git-tracked +
 untracked-not-ignored files only, 200 MB cap; submodule contents are not copied). Relative
 writes land in the copy and are listed in `write_attempts_discarded`. The original is
 fingerprinted before/after: an absolute-path write is *detected, not prevented* and turns
