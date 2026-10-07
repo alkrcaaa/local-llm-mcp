@@ -4,8 +4,9 @@ Workers live in workers.json (see workers.example.json), re-read on every call,
 so moving a vLLM host or swapping the served model is an edit to one file — no
 restart. A worker with an empty "model" asks its server which id it serves.
 
-Read-only is enforced by structure, not by the CLI's own flag: the flags exist
-(--approval-mode plan, --mode plan) but are not trusted. The worker runs in a
+Read-only is enforced by structure, not by the CLI's own flag: qwen keeps
+--approval-mode plan as a cheap extra, agy runs without --mode plan (too slow,
+see _build), and neither is trusted. The worker runs in a
 throwaway copy of the project, and the original is fingerprinted before/after so
 an absolute-path write that escapes the copy is reported, not silent.
 """
@@ -15,6 +16,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -114,8 +116,12 @@ def _build(spec: dict, worker_cmd_prompt: str, model: str, timeout: int) -> tupl
         env = {"OPENAI_API_KEY": "not-needed", "OPENAI_BASE_URL": spec["base_url"], "OPENAI_MODEL": model}
         return cmd, env
     if spec["kind"] == "agy":
+        # No `--mode plan`: it guards nothing here (the copy does) and makes agy
+        # write a plan + walkthrough artifact on every turn -- measured 2026-10-07,
+        # a one-line file read took 47 s in plan mode vs 14 s without. Not the
+        # whole story: a real diff review still exceeded 600 s afterwards.
         cmd = [spec.get("bin", "agy"), "-p", worker_cmd_prompt, "--output-format", "json",
-               "--print-timeout", f"{timeout}s", "--mode", "plan"]
+               "--print-timeout", f"{timeout}s"]
         if spec.get("model"):  # else agy falls back to the IDE-shared settings.json model
             cmd += ["--model", spec["model"]]
         return cmd, {}
@@ -134,7 +140,7 @@ def _parse(kind: str, stdout: str) -> tuple[bool, str]:
 
 
 def ask_worker(prompt: str, working_dir: str, worker: str = "", role: str = "ask",
-               timeout: int = 300, fallback_url: str = "") -> dict[str, Any]:
+               timeout: int = 600, fallback_url: str = "") -> dict[str, Any]:
     default, workers = load_workers(fallback_url)
     name = worker or default
     if name not in workers:
@@ -166,6 +172,11 @@ def ask_worker(prompt: str, working_dir: str, worker: str = "", role: str = "ask
         copy_before = _fingerprint(sandbox, files)
 
         cmd, env = _build(spec, persona(role) + prompt, model, timeout)
+        # The worker CLI runs the user's own hooks. Left on, the vault Stop hooks
+        # file every worker run as an "Oturum Özeti" under a throwaway
+        # tmp--advisor-* mem-lite namespace (13 such rows by 2026-10-07).
+        env["VAULT_HOOKS_OFF"] = "1"
+        started = time.monotonic()
         try:
             r = subprocess.run(cmd, cwd=str(sandbox), capture_output=True, text=True,
                                timeout=timeout, stdin=subprocess.DEVNULL, env={**os.environ, **env})
@@ -184,7 +195,8 @@ def ask_worker(prompt: str, working_dir: str, worker: str = "", role: str = "ask
 
         result = {
             "status": "success" if ok and r.returncode == 0 else "error",
-            "worker": name, "model": model or spec["kind"], "role": role, "response": text,
+            "worker": name, "model": model or spec["kind"], "role": role,
+            "elapsed_s": round(time.monotonic() - started, 1), "response": text,
             "write_attempts_discarded": wrote_in_copy,
             "original_modified": touched_original,
         }

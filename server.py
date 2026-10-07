@@ -280,7 +280,7 @@ def ask_worker(
     working_dir: str,
     worker: str = "",
     role: str = "ask",
-    timeout: int = 300,
+    timeout: int = 600,
 ) -> dict[str, Any]:
     """Ask a worker (local Qwen or Gemini) a READ-ONLY question about a project.
 
